@@ -1,124 +1,89 @@
-# [Project Title] 📊
-> One-line description of what this project is about and what problem it solves.
-
-[![SQL](https://img.shields.io/badge/SQL-BigQuery-4285F4?style=flat&logo=google-cloud)](https://cloud.google.com/bigquery)
-[![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](YOUR-DASHBOARD-LINK)
+E-commerce Sales Analysis 📊
+> End-to-end analysis of a Brazilian e-commerce dataset, covering revenue trends, customer segmentation (RFM), and cohort retention.
+![SQL](https://img.shields.io/badge/SQL-BigQuery-4285F4?style=flat&logo=google-cloud)
+![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)
 [![Status](https://img.shields.io/badge/Status-Complete-success?style=flat)]()
-
 ---
-
-## 📌 Business Context
-
-> *What problem does this project solve? Why does it matter to the business?*
-
-**Industry:** [e.g. E-commerce / SaaS / Marketing]
-**Stakeholders:** [e.g. Marketing team, C-level, Finance]
-**Business question:** [e.g. "Why is our churn rate increasing and what customer segments are most at risk?"]
-
-A brief paragraph (3–5 sentences) explaining the business scenario, the challenge, and why having this data matters for decision-making.
-
+📌 Business Context
+Industry: E-commerce
+Stakeholders: Marketing, Commercial, and Finance teams
+Business question: How has revenue evolved over time, and which customer segments drive the most value?
+This project analyzes 96,000+ real orders from Olist, Brazil's largest e-commerce marketplace, covering 2016–2018. The goal was to understand revenue growth patterns, identify high-value customer segments using RFM analysis, and measure customer retention through cohort analysis — delivering insights that support strategic decisions in acquisition, retention, and revenue planning.
 ---
-
-## 🎯 Objectives
-
-- [ ] Objective 1 — [e.g. Identify top revenue-driving customer segments]
-- [ ] Objective 2 — [e.g. Build a cohort retention analysis]
-- [ ] Objective 3 — [e.g. Deliver an executive dashboard with actionable KPIs]
-
+🎯 Objectives
+[x] Analyze monthly revenue trends and identify growth patterns
+[x] Segment customers using RFM methodology (Recency, Frequency, Monetary)
+[x] Build a cohort retention analysis to measure customer loyalty
+[x] Deliver an executive dashboard with actionable KPIs
 ---
-
-## 🗂 Dataset
-
-| Field | Details |
-|---|---|
-| **Source** | [e.g. Kaggle / BigQuery Public Data / Simulated] |
-| **Size** | [e.g. ~500K rows, 12 columns] |
-| **Period** | [e.g. Jan 2022 – Dec 2023] |
-| **Link** | [Dataset URL or description] |
-
-**Key fields used:**
-- `field_name` — description
-- `field_name` — description
-- `field_name` — description
-
+🗂 Dataset
+Field	Details
+Source	Kaggle — Brazilian E-Commerce Public Dataset by Olist
+Size	~100K orders, 5 tables
+Period	October 2016 – August 2018
+Tables used:
+`orders` — order status and timestamps
+`order_items` — products and quantities per order
+`customers` — customer location and ID
+`payments` — payment method and value
+`products` — product category and attributes
 ---
-
-## 🔧 Technical Approach
-
-### Data Model
-Brief description of how the data is structured (raw → staging → marts, or whatever applies).
-
+🔧 Technical Approach
+Data Model
 ```
-raw_orders
-    └── stg_orders         -- cleaned, deduplicated
-         └── fct_orders    -- fact table with metrics
-         └── dim_customers -- customer attributes
+olist.orders
+    └── olist.payments        -- payment value per order
+    └── olist.order_items     -- items per order
+    └── olist.customers       -- customer attributes
+    └── olist.products        -- product details
 ```
-
-### SQL Queries
-Main analytical queries built for this project:
-
-| Query | Description |
-|---|---|
-| [`cohort_analysis.sql`](./sql/cohort_analysis.sql) | Monthly cohort retention |
-| [`ltv_by_segment.sql`](./sql/ltv_by_segment.sql) | Customer LTV by acquisition channel |
-| [`revenue_trends.sql`](./sql/revenue_trends.sql) | Weekly/monthly revenue breakdown |
-
+Views created in BigQuery for dashboard consumption:
+`vw_revenue_trends` — monthly revenue, orders, and avg order value
+`vw_cohort_retention` — cohort-based retention rates
+`vw_customer_ltv_rfm` — RFM scores and customer segments
+SQL Queries
+Query	Description
+`01_revenue_trends.sql`	Monthly revenue, orders and avg ticket
+`02_cohort_retention.sql`	Cohort retention by acquisition month
+`03_customer_ltv_rfm.sql`	RFM scoring and customer segmentation
 ---
-
-## 📈 Key Findings
-
-> *What did the data tell you? Lead with the business insight, not the technical detail.*
-
-1. **Finding 1** — [e.g. Customers acquired via organic search have 2.3× higher LTV than paid channels]
-2. **Finding 2** — [e.g. Cohort retention drops sharply after month 3 — a critical intervention window]
-3. **Finding 3** — [e.g. Top 20% of customers generate 68% of total revenue]
-
+📈 Key Findings
+Strong revenue growth in 2017 — monthly revenue grew from R$46K (Oct 2016) to over R$1.2M (Nov 2017), a 26× increase in 13 months
+Champions drive disproportionate value — the top customer segment (25% of customers) generates nearly 40% of total revenue
+Low repeat purchase rate — cohort analysis reveals that most customers buy only once, which is consistent with marketplace behavior; this signals an opportunity for retention campaigns targeting the "Potential Loyalists" segment (25% of customers)
+Stable avg order value — ticket size remained consistently between R$140–R$165 throughout the period, suggesting pricing stability
 ---
-
-## 📊 Dashboard
-
-**Tool:** [Tableau Public / Power BI / Looker Studio]
-**Link:** [YOUR DASHBOARD LINK]
-
-![Dashboard Preview](./assets/dashboard_preview.png)
-
-**Dashboard includes:**
-- [e.g. Revenue overview with MoM trend]
-- [e.g. Cohort retention heatmap]
-- [e.g. Customer segment breakdown]
-
+📊 Dashboard
+Tool: Looker Studio
+Link: View live dashboard
+Dashboard includes:
+KPI scorecards: Total Revenue, Total Orders, Avg Order Value
+Monthly revenue trend (line chart)
+Customer segment distribution (donut chart)
+Revenue by customer segment (bar chart)
+Cohort retention table
 ---
-
-## 📁 Repository Structure
-
+📁 Repository Structure
 ```
-project-name/
+ecommerce-sales-analysis/
 │
 ├── sql/
-│   ├── cohort_analysis.sql
-│   ├── ltv_by_segment.sql
-│   └── revenue_trends.sql
+│   ├── 01_revenue_trends.sql
+│   ├── 02_cohort_retention.sql
+│   └── 03_customer_ltv_rfm.sql
 │
 ├── assets/
 │   └── dashboard_preview.png
 │
 └── README.md
 ```
-
 ---
-
-## 🚀 How to Reproduce
-
-1. **Dataset** — Download the dataset from [source link] or use the sample provided in `/data`
-2. **SQL** — Queries are written for BigQuery. Run them in order:
-   - `01_staging.sql` → `02_cohort_analysis.sql` → `03_ltv.sql`
-3. **Dashboard** — Access the live dashboard via the link above, or import the `.pbix` / `.twbx` file from `/dashboard`
-
+🚀 How to Reproduce
+Download the dataset from Kaggle
+Upload the 5 CSV files to BigQuery (dataset name: `olist`)
+Run the SQL queries in order to create the views
+Connect the views to Looker Studio and build the dashboard
 ---
-
-## 👩‍💻 About
-
-Built by **Ana Paula Borges** · [LinkedIn](https://linkedin.com/in/ANAPBORGES) · [GitHub](https://github.com/ANAPBORGES)
-
-*Senior Data Analyst & Team Leader with 10+ years in BI, DataViz, and Marketing Analytics.*
+👩‍💻 About
+Built by Ana Paula Borges · LinkedIn · GitHub
+Senior Data Analyst & Team Leader with 10+ years in BI, DataViz, and Marketing Analytics.
