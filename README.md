@@ -121,7 +121,7 @@ ecommerce-sales-analysis/
 
 ## 👩‍💻 About
 
-Built by **Ana Paula Borges** · [LinkedIn](https://linkedin.com/in/ANAPBORGES) · [GitHub](https://github.com/ANAPBORGES)
+Built by **Ana Paula Borges** · [LinkedIn](https://linkedin.com/in/ana-paula-d-araújo-borges) · [GitHub](https://github.com/ANAPBORGES)
 
 *Senior Data Analyst & Team Leader with 10+ years in BI, DataViz, and Marketing Analytics.*
 
