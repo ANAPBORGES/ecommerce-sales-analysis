@@ -2,7 +2,7 @@
 > End-to-end analysis of a Brazilian e-commerce dataset, covering revenue trends, customer segmentation (RFM), and cohort retention.
 
 [![SQL](https://img.shields.io/badge/SQL-BigQuery-4285F4?style=flat&logo=google-cloud)](https://cloud.google.com/bigquery)
-[![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
+[![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](https://datastudio.google.com/s/un-nuhnGpV8)
 [![Status](https://img.shields.io/badge/Status-Complete-success?style=flat)]()
 
 ---
@@ -81,7 +81,7 @@ Views created in BigQuery for dashboard consumption:
 ## 📊 Dashboard
 
 **Tool:** Looker Studio
-**Link:** [View live dashboard](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
+**Link:** [View live dashboard](https://datastudio.google.com/s/un-nuhnGpV8)
 
 **Dashboard includes:**
 - KPI scorecards: Total Revenue, Total Orders, Avg Order Value
