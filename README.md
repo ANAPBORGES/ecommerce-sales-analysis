@@ -81,7 +81,7 @@ Views created in BigQuery for dashboard consumption:
 ## 📊 Dashboard
 
 **Tool:** Looker Studio
-**Link:** [View live dashboard]([https://datastudio.google.com/s/un-nuhnGpV8](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6))
+**Link:** [View live dashboard](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
 
 **Dashboard includes:**
 - KPI scorecards: Total Revenue, Total Orders, Avg Order Value
