@@ -46,26 +46,35 @@ This project analyzes 96,000+ real orders from Olist, Brazil's largest e-commerc
 ## 🔧 Technical Approach
 
 ### Data Model
-```
-olist.orders
-    └── olist.payments        -- payment value per order
-    └── olist.order_items     -- items per order
-    └── olist.customers       -- customer attributes
-    └── olist.products        -- product details
-```
 
-Views created in BigQuery for dashboard consumption:
-- `vw_revenue_trends` — monthly revenue, orders, and avg order value
-- `vw_cohort_retention` — cohort-based retention rates
-- `vw_customer_ltv_rfm` — RFM scores and customer segments
+```
+Kaggle Olist Dataset (5 CSVs)
+        │
+        ▼
+BigQuery: analytics-portfolio-496419.olist.*   ← 5 raw tables (~96K orders)
+        │
+        ├── vw_revenue_trends    ← monthly revenue, orders, customers, avg ticket
+        ├── vw_cohort_retention  ← monthly cohort × month_number retention table
+        └── vw_customer_ltv_rfm ← one row per customer: RFM scores + segment
+                │
+                ▼
+        Looker Studio (3 pages: Sales Overview · Customer Analysis · Cohort Retention)
+```
 
 ### SQL Queries
 
 | Query | Description |
 |---|---|
-| [`01_revenue_trends.sql`](./sql/01_revenue_trends.sql) | Monthly revenue, orders and avg ticket |
-| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention by acquisition month |
-| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring and customer segmentation |
+| [`01_revenue_trends.sql`](./sql/01_revenue_trends.sql) | Monthly revenue, orders and avg ticket — feeds Sales Overview page |
+| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention using a 3-CTE pipeline with self-join — feeds Cohort Retention page |
+| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring with NTILE(4) quartiles and segment classification — feeds Customer Analysis page |
+
+### Looker Studio Implementation
+
+| Document | Description |
+|---|---|
+| [`looker_studio/calculated_fields.md`](./looker_studio/calculated_fields.md) | Calculated fields, aggregation rationale, and visual field mappings per page |
+| [`looker_studio/data_model.md`](./looker_studio/data_model.md) | Raw table schemas, view columns, RFM scoring logic, and cohort boundary notes |
 
 ---
 
@@ -83,12 +92,21 @@ Views created in BigQuery for dashboard consumption:
 **Tool:** Looker Studio
 **Link:** [View live dashboard](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
 
-**Dashboard includes:**
-- KPI scorecards: Total Revenue, Total Orders, Avg Order Value
-- Monthly revenue trend (line chart)
-- Customer segment distribution (donut chart)
-- Revenue by customer segment (bar chart)
-- Cohort retention table
+The dashboard has 3 pages with a shared date filter:
+
+| Page | Description |
+|---|---|
+| **Sales Overview** | Revenue, AVG Order Value, Orders KPIs · Monthly revenue bar chart · Donut by year |
+| **Customer Analysis** | RFM segment distribution · Pivot table of f_score × segment · Donut and bar chart |
+| **Cohort Retention** | Heat-map table of 23 monthly cohorts showing retained vs acquired customers |
+
+**Previews:**
+
+| Sales Overview | Customer Analysis |
+|---|---|
+| ![Sales Overview](./assets/Dashboard_Preview_p1_Looker_Studio.png) | ![Customer Analysis](./assets/Dashboard_Preview_p2_Looker_Studio.png) |
+
+![Cohort Retention](./assets/Dashboard_Preview_p3_Looker_Studio.png)
 
 ---
 
@@ -98,12 +116,18 @@ Views created in BigQuery for dashboard consumption:
 ecommerce-sales-analysis/
 │
 ├── sql/
-│   ├── 01_revenue_trends.sql
-│   ├── 02_cohort_retention.sql
-│   └── 03_customer_ltv_rfm.sql
+│   ├── 01_revenue_trends.sql           ← Monthly revenue, orders, avg ticket
+│   ├── 02_cohort_retention.sql         ← Cohort retention (3-CTE pipeline, self-join)
+│   └── 03_customer_ltv_rfm.sql         ← RFM scoring with NTILE(4) + segment rules
+│
+├── looker_studio/
+│   ├── calculated_fields.md            ← Calculated fields + visual field mappings per page
+│   └── data_model.md                   ← Raw table schemas, view columns, RFM & cohort notes
 │
 ├── assets/
-│   └── dashboard_preview.png
+│   ├── Dashboard_Preview_p1_Looker_Studio.png
+│   ├── Dashboard_Preview_p2_Looker_Studio.png
+│   └── Dashboard_Preview_p3_Looker_Studio.png
 │
 └── README.md
 ```
