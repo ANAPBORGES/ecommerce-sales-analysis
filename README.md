@@ -65,9 +65,14 @@ BigQuery: analytics-portfolio-496419.olist.*   ← 5 raw tables (~96K orders)
 
 | Query | Description |
 |---|---|
-| [`01_revenue_trends.sql`](./sql/01_revenue_trends.sql) | Monthly revenue, orders and avg ticket — feeds Sales Overview page |
-| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention using a 3-CTE pipeline with self-join — feeds Cohort Retention page |
-| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring with NTILE(4) quartiles and segment classification — feeds Customer Analysis page |
+| [`01_revenue_trends.sql`](./sql/01_revenue_trends.sql) | Monthly revenue, orders and avg ticket |
+| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention — 3-CTE pipeline with self-join |
+| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring with NTILE(4) quartiles and segment classification |
+| [`04_revenue_decomposition.sql`](./sql/04_revenue_decomposition.sql) | New vs returning customer revenue split + MoM growth with LAG + 3-month rolling average |
+| [`05_customer_journey.sql`](./sql/05_customer_journey.sql) | Repeat purchase funnel — ROW_NUMBER to identify 1st/2nd order, time-to-repeat, uplift |
+| [`06_geographic_analysis.sql`](./sql/06_geographic_analysis.sql) | Revenue by state with RANK, cumulative share (Pareto), YoY growth with LAG |
+| [`07_category_performance.sql`](./sql/07_category_performance.sql) | Category Pareto analysis — cumulative revenue share, revenue rank, YoY growth |
+| [`08_cohort_matrix.sql`](./sql/08_cohort_matrix.sql) | Full cohort retention matrix — pre-pivoted columns for months 0–12 |
 
 ### Looker Studio Implementation
 
@@ -92,13 +97,15 @@ BigQuery: analytics-portfolio-496419.olist.*   ← 5 raw tables (~96K orders)
 **Tool:** Looker Studio
 **Link:** [View live dashboard](https://datastudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
 
-The dashboard has 3 pages with a shared date filter:
+The dashboard has 5 pages with a shared date filter:
 
 | Page | Description |
 |---|---|
 | **Sales Overview** | Revenue, AVG Order Value, Orders KPIs · Monthly revenue bar chart · Donut by year |
 | **Customer Analysis** | RFM segment distribution · Pivot table of f_score × segment · Donut and bar chart |
 | **Cohort Retention** | Heat-map table of 23 monthly cohorts showing retained vs acquired customers |
+| **Geographic Analysis** | Revenue by state map · Top 10 states bar chart · KPI cards |
+| **Category Performance** | Pareto chart (bars + cumulative line) · KPI cards |
 
 **Previews:**
 
@@ -118,7 +125,12 @@ ecommerce-sales-analysis/
 ├── sql/
 │   ├── 01_revenue_trends.sql           ← Monthly revenue, orders, avg ticket
 │   ├── 02_cohort_retention.sql         ← Cohort retention (3-CTE pipeline, self-join)
-│   └── 03_customer_ltv_rfm.sql         ← RFM scoring with NTILE(4) + segment rules
+│   ├── 03_customer_ltv_rfm.sql         ← RFM scoring with NTILE(4) + segment rules
+│   ├── 04_revenue_decomposition.sql    ← New vs returning split + MoM growth + rolling avg
+│   ├── 05_customer_journey.sql         ← Repeat purchase funnel + time-to-repeat
+│   ├── 06_geographic_analysis.sql      ← Revenue by state with RANK + Pareto + YoY
+│   ├── 07_category_performance.sql     ← Category Pareto + cumulative share + YoY
+│   └── 08_cohort_matrix.sql            ← Full cohort matrix (pre-pivoted months 0–12)
 │
 ├── looker_studio/
 │   ├── calculated_fields.md            ← Calculated fields + visual field mappings per page

@@ -58,17 +58,6 @@ with_window_metrics AS (
       ORDER BY order_year
     )                                                    AS prev_year_revenue,
 
-    -- Rank change vs prior year (did the state move up or down?)
-    RANK() OVER (
-      PARTITION BY order_year
-      ORDER BY total_revenue DESC
-    ) - LAG(
-      RANK() OVER (PARTITION BY order_year ORDER BY total_revenue DESC)
-    ) OVER (
-      PARTITION BY customer_state
-      ORDER BY order_year
-    )                                                    AS rank_change_vs_prior_year
-
   FROM state_yearly
 )
 
@@ -83,11 +72,12 @@ SELECT
   revenue_share_pct,
   cumulative_revenue_share_pct,
   prev_year_revenue,
-  ROUND(
-    (total_revenue - prev_year_revenue) / NULLIF(prev_year_revenue, 0) * 100,
-    1
-  )                                                      AS yoy_growth_pct,
-  rank_change_vs_prior_year
+  -- YoY calculado apenas quando receita anterior >= 5000 (evita distorcao do ano parcial 2016)
+  CASE
+    WHEN prev_year_revenue IS NULL THEN NULL
+    WHEN prev_year_revenue < 5000  THEN NULL
+    ELSE ROUND((total_revenue - prev_year_revenue) / prev_year_revenue * 100, 1)
+  END                                                    AS yoy_growth_pct
 
 FROM with_window_metrics
 ORDER BY order_year ASC, revenue_rank ASC;
