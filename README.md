@@ -2,8 +2,7 @@
 > End-to-end analysis of a Brazilian e-commerce dataset covering revenue trends, customer segmentation (RFM), cohort retention, geographic performance, and category analysis.
 
 [![SQL](https://img.shields.io/badge/SQL-BigQuery-4285F4?style=flat&logo=google-cloud)](https://cloud.google.com/bigquery)
-[![BigQuery](https://img.shields.io/badge/Dataset-BigQuery%20Public-4285F4?style=flat&logo=google-cloud)](https://console.cloud.google.com/bigquery?project=analytics-portfolio-496419&ws=!1m5!1m4!3m2!1sanalyt
-  ics-portfolio-496419!2solist!23sTREE_NODE_SELECTION)
+[![BigQuery](https://img.shields.io/badge/Dataset-BigQuery%20Public-4285F4?style=flat&logo=google-cloud)](https://console.cloud.google.com/bigquery?project=analytics-portfolio-496419&ws=!1m5!1m4!3m2!1sanalytics-portfolio-496419!2solist!23sTREE_NODE_SELECTION)
 [![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](https://lookerstudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
 [![Status](https://img.shields.io/badge/Status-Complete-success?style=flat)]()
 
