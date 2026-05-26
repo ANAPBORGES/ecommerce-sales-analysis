@@ -1,4 +1,4 @@
-﻿# Looker Studio â€” Calculated Fields
+﻿# Looker Studio — Calculated Fields
 
 This document describes the calculated fields created in Looker Studio for the E-commerce Sales Analysis dashboard, and the field mappings for each visual across the 3 report pages.
 
