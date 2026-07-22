@@ -1,33 +1,22 @@
 # E-commerce Sales Analysis
-> End-to-end analysis of a Brazilian e-commerce dataset covering revenue trends, customer segmentation (RFM), cohort retention, geographic performance, and category analysis.
+> End-to-end analysis of a global e-commerce dataset covering revenue trends, customer segmentation (RFM), cohort retention, geographic performance, and category & margin analysis — built entirely on a **live, public BigQuery dataset** so every query is reproducible with zero setup.
 
 [![SQL](https://img.shields.io/badge/SQL-BigQuery-4285F4?style=flat&logo=google-cloud)](https://cloud.google.com/bigquery)
-[![BigQuery](https://img.shields.io/badge/Dataset-BigQuery%20Public-4285F4?style=flat&logo=google-cloud)](https://console.cloud.google.com/bigquery?project=analytics-portfolio-496419&ws=!1m5!1m4!3m2!1sanalytics-portfolio-496419!2solist!23sTREE_NODE_SELECTION)
-[![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](https://lookerstudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
-[![Status](https://img.shields.io/badge/Status-Complete-success?style=flat)]()
+[![Dataset](https://img.shields.io/badge/Dataset-thelook__ecommerce%20(public)-34A853?style=flat&logo=google-cloud)](https://console.cloud.google.com/marketplace/product/bigquery-public-data/thelook-ecommerce)
+[![Dashboard](https://img.shields.io/badge/Dashboard-Looker%20Studio-4285F4?style=flat&logo=google)](#dashboard)
+[![Status](https://img.shields.io/badge/Status-SQL%20complete%20·%20dashboard%20in%20rebuild-yellow?style=flat)]()
 
 ---
 
 ## Business Context
 
-**Industry:** E-commerce
+**Industry:** E-commerce (global apparel marketplace)
 **Stakeholders:** Marketing, Commercial, and Finance teams
-**Business question:** *How has revenue evolved over time, which customer segments drive the most value, and where are the opportunities for growth?*
+**Business question:** *How has revenue evolved over time, which customer segments and markets drive the most value, and where are the opportunities for growth and margin?*
 
-This project analyzes 96,000+ real orders from Olist, Brazil's largest e-commerce marketplace, covering 2017-2018. The goal was to understand revenue growth patterns, decompose revenue into new vs returning customers, identify high-value segments using RFM analysis, measure cohort retention, and deliver geographic and category-level performance insights.
+This project analyzes **94K+ orders** from `theLook`, a fictitious global fashion retailer whose data Google publishes and keeps live in BigQuery. The goal was to understand revenue growth, decompose it into new vs returning customers, identify high-value segments with RFM, measure cohort retention, and deliver geographic and category-level insights — including **profit margin**, which the dataset supports through product cost.
 
----
-
-## Objectives
-
-- [x] Analyze monthly revenue trends with MoM growth and 3-month rolling average
-- [x] Decompose revenue into new vs returning customers (corrected for Olist's unique customer_id structure)
-- [x] Segment customers using RFM methodology with NTILE(4) quartile scoring
-- [x] Build a cohort retention matrix showing retention decay over 12 months
-- [x] Analyze repeat purchase behavior — funnel, time-to-repeat, and order value uplift
-- [x] Deliver geographic performance analysis by Brazilian state
-- [x] Perform Pareto analysis on product categories
-- [x] Deliver a 5-page executive dashboard in Looker Studio
+> **Why a public dataset?** Everything here runs against `bigquery-public-data.thelook_ecommerce`, hosted by Google and always available. No data upload, no credentials, no expiry — anyone can copy a query and run it. That makes the analysis fully **reproducible**.
 
 ---
 
@@ -35,16 +24,14 @@ This project analyzes 96,000+ real orders from Olist, Brazil's largest e-commerc
 
 | Field | Details |
 |---|---|
-| **Source** | [Kaggle — Brazilian E-Commerce Public Dataset by Olist](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce) |
-| **Size** | ~100K orders, 5 tables |
-| **Period** | January 2017 – August 2018 (2016 excluded — partial year) |
+| **Source** | [`bigquery-public-data.thelook_ecommerce`](https://console.cloud.google.com/marketplace/product/bigquery-public-data/thelook-ecommerce) |
+| **Grain** | Order line item (`order_items`), one row per product per order |
+| **Volume** | ~94K valid orders · 66K customers · US$8.1M revenue |
+| **Period** | January 2019 – present (dataset is continuously updated) |
 
-**Tables used:**
-- `orders` — order status and timestamps
-- `order_items` — products and quantities per order
-- `customers` — customer location and unique ID
-- `payments` — payment method and value
-- `products` — product category and attributes
+**Tables used:** `order_items` (sales, status, timestamps), `orders`, `users` (demographics, country), `products` (category, cost, retail price).
+
+**Revenue recognition:** an item is counted as revenue only when its `status` is **not** `Cancelled` or `Returned`. Customer identity uses `user_id` (one per person), so new-vs-returning and cohort logic is measured cleanly at the person level.
 
 ---
 
@@ -53,81 +40,84 @@ This project analyzes 96,000+ real orders from Olist, Brazil's largest e-commerc
 ### Data Model
 
 ```
-Kaggle Olist Dataset (5 CSVs)
-        |
-        v
-BigQuery: analytics-portfolio-496419.olist.*   <- 5 raw tables (~96K orders)
-        |
-        |-- vw_revenue_analysis     <- monthly revenue, new/returning split, MoM growth, rolling avg
-        |-- vw_new_vs_returning     <- 2-row aggregation for donut chart
-        |-- vw_customer_ltv_rfm    <- one row per customer: RFM scores + segment
-        |-- vw_customer_journey    <- repeat purchase funnel (uses customer_unique_id)
-        |-- vw_repeat_windows      <- 3-row table for repeat window bar chart
-        |-- vw_cohort_matrix       <- cohort retention matrix (pre-pivoted months 0-12)
-        |-- vw_geographic_analysis <- revenue by state with RANK + Pareto + YoY
-        `-- vw_category_performance<- category Pareto + cumulative share + YoY
-                |
-                v
-        Looker Studio (5 pages)
+bigquery-public-data.thelook_ecommerce   (live Google public dataset)
+   order_items ── products (cost → margin)
+        │            users (country, demographics)
+        ▼
+   9 analytical queries (BigQuery Standard SQL, window functions)
+        │
+        ├── 01 revenue_analysis      → monthly revenue, new/returning split, MoM, 3M rolling avg
+        ├── 02 cohort_retention      → long-format cohort retention
+        ├── 03 customer_ltv_rfm      → RFM scoring + segments (per user_id)
+        ├── 05 customer_journey      → repeat-purchase funnel, time-to-repeat, uplift
+        ├── 06 geographic_analysis   → revenue/profit by country, RANK, Pareto, YoY
+        ├── 07 category_performance  → category Pareto + margin + YoY
+        ├── 08 cohort_matrix         → pre-pivoted cohort matrix (months 0–12)
+        ├── 09 new_vs_returning      → 2-row split for a donut chart
+        └── 10 repeat_windows        → 3-row repeat rate by 30/90/180 days
+        ▼
+   Looker Studio (5 pages) — connected via BigQuery custom queries
 ```
-
-> **Important note on customer_id:** The Olist dataset uses a unique `customer_id` per order, not per person. All analyses tracking returning customers use `customer_unique_id` from the `customers` table to correctly identify repeat buyers.
 
 ### SQL Queries
 
 | Query | Description |
 |---|---|
 | [`01_revenue_analysis.sql`](./sql/01_revenue_analysis.sql) | Monthly revenue + new vs returning split + MoM growth (LAG) + 3M rolling average |
-| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention — 3-CTE pipeline with self-join |
-| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring with NTILE(4) quartiles and segment classification |
-| [`05_customer_journey.sql`](./sql/05_customer_journey.sql) | Repeat purchase funnel — ROW_NUMBER to identify 1st/2nd order, time-to-repeat, uplift |
-| [`06_geographic_analysis.sql`](./sql/06_geographic_analysis.sql) | Revenue by state with RANK, cumulative share (Pareto), YoY growth with LAG |
-| [`07_category_performance.sql`](./sql/07_category_performance.sql) | Category Pareto analysis — cumulative revenue share, revenue rank, YoY growth |
-| [`08_cohort_matrix.sql`](./sql/08_cohort_matrix.sql) | Full cohort retention matrix — pre-pivoted columns for months 0-12 |
-| [`09_new_vs_returning.sql`](./sql/09_new_vs_returning.sql) | Aggregated new vs returning revenue split (2 rows) |
-| [`10_repeat_windows.sql`](./sql/10_repeat_windows.sql) | Repeat purchase rate by time window — 30, 90 and 180 days |
+| [`02_cohort_retention.sql`](./sql/02_cohort_retention.sql) | Cohort retention (long format) — CTE pipeline keyed on `user_id` |
+| [`03_customer_ltv_rfm.sql`](./sql/03_customer_ltv_rfm.sql) | RFM scoring — NTILE(4) for R/M, direct mapping for the discrete Frequency |
+| [`05_customer_journey.sql`](./sql/05_customer_journey.sql) | Repeat-purchase funnel — ROW_NUMBER to pair 1st/2nd order, time-to-repeat, uplift |
+| [`06_geographic_analysis.sql`](./sql/06_geographic_analysis.sql) | Revenue & profit by country with RANK, cumulative share (Pareto), YoY (LAG) |
+| [`07_category_performance.sql`](./sql/07_category_performance.sql) | Category Pareto + profit margin (uses product cost) + YoY growth |
+| [`08_cohort_matrix.sql`](./sql/08_cohort_matrix.sql) | Full cohort matrix — pre-pivoted columns for months 0–12 (heatmap-ready) |
+| [`09_new_vs_returning.sql`](./sql/09_new_vs_returning.sql) | Aggregated new vs returning revenue (2 rows, self-contained) |
+| [`10_repeat_windows.sql`](./sql/10_repeat_windows.sql) | Repeat rate by 30 / 90 / 180-day window (3 rows, self-contained) |
 
 ### Looker Studio Implementation
 
 | Document | Description |
 |---|---|
-| [`looker_studio/calculated_fields.md`](./looker_studio/calculated_fields.md) | Calculated fields, aggregation rationale, and visual field mappings per page |
-| [`looker_studio/data_model.md`](./looker_studio/data_model.md) | Raw table schemas, view columns, RFM scoring logic, and cohort boundary notes |
+| [`looker_studio/data_model.md`](./looker_studio/data_model.md) | Source schema, query outputs, RFM scoring logic, and cohort notes |
+| [`looker_studio/calculated_fields.md`](./looker_studio/calculated_fields.md) | Calculated fields and per-page visual field mappings |
 
 ---
 
 ## Key Findings
 
-1. **Revenue driven almost entirely by new customers** — returning customer revenue never exceeded 2% of monthly total, confirming Olist operates as a pure acquisition marketplace
-2. **3% repeat purchase rate** — only 2,801 of 93,357 unique customers placed a second order; 51% of those returned within 30 days
-3. **Champions drive disproportionate value** — top RFM segment (25% of customers) generates ~40% of total revenue
-4. **Retention collapses after month 0** — cohort matrix shows retention dropping from 100% to ~0.5% in month 1, stabilizing at 0.2-0.3% through month 12
-5. **SP dominates geographically** — Sao Paulo alone accounts for ~40% of national revenue
-6. **Top 10 categories = 80% of revenue** — classic Pareto concentration; `cama_mesa_banho` leads with R$580K in 2017
+1. **Strong, accelerating growth** — recognized revenue grew from **US$73K (2019) to US$2.1M (2025)**, a ~29× increase, with **+54% YoY in 2025**; the 3-month rolling average confirms sustained upward momentum.
+2. **Healthy repeat business** — **30.8% of customers place a second order** (20,445 of 66,397), and returning customers already account for **28.5% of total revenue** — a real retention engine, not a pure-acquisition marketplace.
+3. **Value concentrated in the top segments** — *Champions* (8.6% of customers) drive **21.3% of revenue**; together *Champions + Loyal Customers* (~30% of customers) generate **55% of revenue**.
+4. **Retention has a long tail** — cohort retention drops from 100% (month 0) to ~5% (month 1), then stabilizes around **1.6–2%** through month 12, meaning a small but durable base keeps returning across the year.
+5. **Geographically concentrated** — **China (~34%)**, the United States (~23%), and **Brazil (~14%)** lead; the top 3 markets account for roughly **70%** of revenue.
+6. **Classic category Pareto with strong margins** — the top ~8 of 26 categories (led by *Outerwear & Coats* and *Jeans*) generate **~60% of revenue**, at healthy **46–60% gross margins**; overall blended margin is **51.9%**.
+
+*All figures produced by the queries in [`/sql`](./sql), run live against the public dataset.*
 
 ---
 
 ## Dashboard
 
-**Tool:** Looker Studio
-**Link:** [View live dashboard](https://lookerstudio.google.com/reporting/ccd24456-6f65-467c-a16c-c03b59bbb2c6)
-**BigQuery:** [View public dataset](https://console.cloud.google.com/bigquery?project=analytics-portfolio-496419&ws=!1m5!1m4!3m2!1sanalytics-portfolio-496419!2solist!23sTREE_NODE_SELECTION)
+**Tool:** Looker Studio · connected to BigQuery via **custom queries** (no persisted tables, so nothing expires).
 
-| Page | Description |
+> **Status: in rebuild.** The analysis was re-based onto the live `thelook_ecommerce` public dataset, and the 5-page Looker Studio dashboard is being rebuilt on top of it. The planned pages:
+
+| Page | Content |
 |---|---|
-| **Sales Overview** | Revenue KPIs · Monthly revenue + 3M rolling avg · New vs returning donut · AVG order value trend |
-| **Customer Analysis** | RFM segment revenue · Customer segment distribution · Repeat purchase funnel by time window |
-| **Cohort Retention** | Cohort retention matrix (heatmap) showing decay from month 0 to month 12 |
-| **Geographic Analysis** | Filled map of Brazil · Top 10 states ranking · Revenue concentration KPIs |
-| **Category Performance** | Pareto chart (bar + cumulative line) · Category performance table with freight % |
+| **Sales Overview** | Revenue KPIs · monthly revenue + 3M rolling avg · new vs returning donut · AOV trend |
+| **Customer Analysis** | RFM segment revenue · segment distribution · repeat-purchase funnel by window |
+| **Cohort Retention** | Cohort retention matrix (heatmap), months 0–12 |
+| **Geographic Analysis** | World map · top countries ranking · revenue concentration KPIs |
+| **Category Performance** | Pareto chart (bar + cumulative line) · category table with margin % |
 
-**Previews:**
+---
 
-| Sales Overview | Customer Analysis |
-|---|---|
-| ![Sales Overview](./assets/Dashboard_Preview_p1_Looker_Studio.png) | ![Customer Analysis](./assets/Dashboard_Preview_p2_Looker_Studio.png) |
+## How to Reproduce
 
-![Cohort Retention](./assets/Dashboard_Preview_p3_Looker_Studio.png)
+No setup, no data upload — the dataset is public and live:
+
+1. Open the [BigQuery console](https://console.cloud.google.com/bigquery) (a free sandbox account is enough).
+2. Copy any query from [`/sql`](./sql) and run it — it reads directly from `bigquery-public-data.thelook_ecommerce`.
+3. To build the dashboard, add a BigQuery data source in Looker Studio using the query as a **custom query**.
 
 ---
 
@@ -135,38 +125,13 @@ BigQuery: analytics-portfolio-496419.olist.*   <- 5 raw tables (~96K orders)
 
 ```
 ecommerce-sales-analysis/
-|
-|-- sql/
-|   |-- 01_revenue_analysis.sql     <- Monthly revenue + new/returning split + MoM + rolling avg
-|   |-- 02_cohort_retention.sql     <- Cohort retention (3-CTE pipeline, self-join)
-|   |-- 03_customer_ltv_rfm.sql     <- RFM scoring with NTILE(4) + segment rules
-|   |-- 05_customer_journey.sql     <- Repeat purchase funnel (uses customer_unique_id)
-|   |-- 06_geographic_analysis.sql  <- Revenue by state with RANK + Pareto + YoY
-|   |-- 07_category_performance.sql <- Category Pareto + cumulative share + YoY
-|   |-- 08_cohort_matrix.sql        <- Full cohort matrix (pre-pivoted months 0-12)
-|   |-- 09_new_vs_returning.sql     <- Aggregated new vs returning (2 rows for donut)
-|   `-- 10_repeat_windows.sql       <- Repeat windows 30/90/180 days (3 rows for bar chart)
-|
-|-- looker_studio/
-|   |-- calculated_fields.md        <- Calculated fields + visual field mappings per page
-|   `-- data_model.md               <- Raw table schemas, view columns, RFM & cohort notes
-|
-|-- assets/
-|   |-- Dashboard_Preview_p1_Looker_Studio.png
-|   |-- Dashboard_Preview_p2_Looker_Studio.png
-|   `-- Dashboard_Preview_p3_Looker_Studio.png
-|
-`-- README.md
+├── sql/                          ← 9 BigQuery analytical queries (window functions, CTEs)
+├── looker_studio/
+│   ├── data_model.md             ← source schema, query outputs, RFM & cohort notes
+│   └── calculated_fields.md      ← calculated fields + per-page field mappings
+├── assets/                       ← dashboard previews (being regenerated for theLook)
+└── README.md
 ```
-
----
-
-## How to Reproduce
-
-1. Download the dataset from [Kaggle](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce)
-2. Upload the 5 CSV files to BigQuery (dataset name: `olist`)
-3. Run the SQL queries in order (01 to 10) to create the views
-4. Connect the views to Looker Studio and build the dashboard
 
 ---
 

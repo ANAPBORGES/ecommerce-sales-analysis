@@ -3,110 +3,84 @@
 ## Architecture
 
 ```
-Kaggle — Olist Brazilian E-Commerce Dataset
+bigquery-public-data.thelook_ecommerce   (live Google public dataset — never expires)
         │
-        ▼
-BigQuery: analytics-portfolio-496419.olist.*   ← 5 raw tables (~96K orders)
-        │
-        ├── olist.orders       ─┐
-        ├── olist.payments      ├── JOINed in SQL queries below
-        ├── olist.customers     │
-        ├── olist.order_items   │
-        └── olist.products     ─┘
+        ├── order_items   ← sales facts: sale_price, status, timestamps  (grain: product × order)
+        ├── orders        ← order header
+        ├── users         ← customer demographics + country
+        └── products      ← category, brand, cost, retail_price
                 │
-                ├── vw_revenue_trends    ← monthly revenue, orders, customers, ticket
-                ├── vw_cohort_retention  ← monthly cohort × month_number retention table
-                └── vw_customer_ltv_rfm ← one row per customer with RFM scores and segment
-                        │
-                        ▼
-                Looker Studio (3 pages, 1 date filter per page)
-                        │
-                        ├── Page 1: Sales Overview      ← revenue trends
-                        ├── Page 2: Customer Analysis   ← RFM segmentation
-                        └── Page 3: Cohort Retention    ← monthly cohort table
+                ▼   9 analytical queries (BigQuery Standard SQL)
+        │
+        ├── 01_revenue_analysis      → monthly revenue, new/returning, MoM, 3M rolling avg
+        ├── 02_cohort_retention      → cohort × month_number retention (long format)
+        ├── 03_customer_ltv_rfm      → one row per user with RFM scores + segment
+        ├── 05_customer_journey      → repeat-purchase funnel (single summary row)
+        ├── 06_geographic_analysis   → revenue/profit by country + Pareto + YoY
+        ├── 07_category_performance  → category Pareto + margin + YoY
+        ├── 08_cohort_matrix         → pre-pivoted cohort matrix (months 0–12)
+        ├── 09_new_vs_returning      → 2-row revenue split (donut)
+        └── 10_repeat_windows        → 3-row repeat rate by window (bar)
+                │
+                ▼
+        Looker Studio (5 pages) — each chart backed by a BigQuery **custom query**
 ```
+
+> **No persisted views.** In a BigQuery sandbox any table/view you create expires after 60 days. To keep the dashboard permanently reproducible, Looker Studio connects to each query as a **custom query** rather than to a stored `vw_*` view. The `.sql` files are the single source of truth.
 
 ---
 
-## BigQuery Raw Tables
+## Source Tables
 
 | Table | Key fields | Role in analysis |
 |---|---|---|
-| `olist.orders` | `order_id`, `customer_id`, `order_purchase_timestamp`, `order_status` | Base join table; filtered to `status = 'delivered'` |
-| `olist.payments` | `order_id`, `payment_value` | Revenue source; joined to orders on `order_id` |
-| `olist.customers` | `customer_id` | Customer identity; used for DISTINCT counts |
-| `olist.order_items` | `order_id`, `product_id` | Used for product-level analysis (available for extension) |
-| `olist.products` | `product_id`, `product_category_name` | Category dimension (available for extension) |
+| `order_items` | `order_id`, `user_id`, `product_id`, `status`, `created_at`, `sale_price` | Sales facts; filtered to `status NOT IN ('Cancelled','Returned')` |
+| `orders` | `order_id`, `user_id`, `status` | Order header (available for extension) |
+| `users` | `id`, `country`, `state`, `age`, `gender`, `traffic_source` | Customer identity & geography (`user_id = users.id`) |
+| `products` | `id`, `category`, `cost`, `retail_price` | Category dimension **and cost** for margin analysis |
+
+**Revenue recognition:** an item counts only when `status` is not `Cancelled`/`Returned`.
+**Customer identity:** `user_id` — one per person (no per-order-id ambiguity).
+**Profit / margin:** `sale_price − products.cost`.
 
 ---
 
-## BigQuery Views
+## Query Outputs
 
-### vw_revenue_trends
-Built from [`01_revenue_trends.sql`](../sql/01_revenue_trends.sql)
+### 01_revenue_analysis → Sales Overview
+Monthly grain. Columns: `year_month`, `total_orders`, `unique_customers`, `total_revenue`, `avg_order_value`, `new_customers`, `returning_customers`, `new_customer_revenue`, `returning_customer_revenue`, `new_revenue_pct`, `returning_revenue_pct`, `prev_month_revenue`, `mom_growth_pct`, `rolling_3m_avg_revenue`.
 
-Joins `orders` and `payments`. Filtered to `order_status = 'delivered'`.
+### 03_customer_ltv_rfm → Customer Analysis
+One row per `user_id`: `recency_days`, `frequency`, `monetary`, `r_score`, `f_score`, `m_score`, `rfm_total`, `customer_segment`.
 
-| Column | Type | Description |
-|---|---|---|
-| `year_month` | STRING | Month in `YYYY-MM` format (e.g., `"2017-11"`) |
-| `total_orders` | INT | Distinct delivered orders per month |
-| `unique_customers` | INT | Distinct customers who ordered that month |
-| `total_revenue` | FLOAT | SUM of payment_value |
-| `avg_order_value` | FLOAT | AVG payment_value per order |
+**Scoring:**
 
----
-
-### vw_cohort_retention
-Built from [`02_cohort_retention.sql`](../sql/02_cohort_retention.sql)
-
-Uses two CTEs:
-- `first_purchase` — finds the first purchase month (cohort assignment) per customer
-- `orders_with_cohort` — joins all subsequent orders back to the cohort, computing `month_number` (months since first purchase)
-- `cohort_size` — counts customers at month 0 (acquisition) per cohort
-
-| Column | Type | Description |
-|---|---|---|
-| `cohort_month` | DATE | First purchase month — defines the cohort |
-| `cohort_customers` | INT | Customers acquired in this cohort (month 0 count) |
-| `month_number` | INT | Months elapsed since first purchase (0 = acquisition month) |
-| `retained_customers` | INT | Customers from this cohort who bought in this month_number |
-| `retention_rate_pct` | FLOAT | retained_customers ÷ cohort_customers × 100 |
-
-**Note on late cohorts:** Cohorts from 2018 show retention close to 100% because the dataset ends in August 2018 — recent buyers haven't had time to churn. This is a data boundary artifact, not a real improvement in retention.
-
----
-
-### vw_customer_ltv_rfm
-Built from [`03_customer_ltv_rfm.sql`](../sql/03_customer_ltv_rfm.sql)
-
-Uses two CTEs:
-- `customer_metrics` — aggregates frequency, monetary value, and last purchase date per customer, then computes `recency_days` from a fixed reference date (`2018-10-01`)
-- `rfm_scores` — applies `NTILE(4)` to assign scores 1–4 for each RFM dimension independently
-
-One row per customer.
-
-| Column | Type | Description |
-|---|---|---|
-| `customer_id` | STRING | Customer identifier |
-| `recency_days` | INT | Days since last purchase (lower = more recent) |
-| `frequency` | INT | Number of distinct orders |
-| `monetary` | FLOAT | Total spend |
-| `r_score` | INT | Recency score 1–4 (4 = most recent) |
-| `f_score` | INT | Frequency score 1–4 (4 = highest frequency) |
-| `m_score` | INT | Monetary score 1–4 (4 = highest spend) |
-| `rfm_total` | INT | r_score + f_score + m_score (range: 3–12) |
-| `customer_segment` | STRING | Champions / Loyal Customers / Potential Loyalists / At Risk / Lost |
-
-**Scoring thresholds:**
-
-| Segment | rfm_total |
+| Dimension | Method |
 |---|---|
-| Champions | ≥ 10 |
-| Loyal Customers | ≥ 8 |
-| Potential Loyalists | ≥ 6 |
-| At Risk | ≥ 4 |
-| Lost | < 4 |
+| Recency (R) | `NTILE(4) OVER (ORDER BY recency_days DESC)` — continuous, quartiles work well |
+| Frequency (F) | `LEAST(frequency, 4)` — **direct mapping**: frequency is discrete (1–4 orders/customer here), so NTILE would split the large "1 order" group arbitrarily. Direct mapping is meaningful and reproducible |
+| Monetary (M) | `NTILE(4) OVER (ORDER BY monetary ASC)` — continuous, quartiles work well |
 
-**Why NTILE(4) instead of fixed thresholds for individual scores?**
-NTILE distributes customers into equal-sized quartiles based on the actual data distribution. This avoids the problem of fixed thresholds (e.g., "frequency > 3 = score 4") that break when the dataset has a skewed distribution — which is common in e-commerce where most customers buy once. Each quartile always contains exactly 25% of the customer base regardless of the distribution shape.
+**Segment thresholds** (on `rfm_total` = R+F+M):
+
+| Segment | rfm_total | Real distribution |
+|---|---|---|
+| Champions | ≥ 10 | 8.6% of customers · 21.3% of revenue |
+| Loyal Customers | ≥ 8 | 21.0% · 33.8% |
+| Potential Loyalists | ≥ 6 | 34.5% · 31.3% |
+| At Risk | ≥ 4 | 28.6% · 12.2% |
+| Lost | < 4 | 7.4% · 1.4% |
+
+### 08_cohort_matrix → Cohort Retention
+`cohort_month`, `cohort_size`, `month_number`, `active_customers`, `retention_rate_pct`, plus pre-pivoted `m00_pct`…`m12_pct` for a heatmap.
+
+> **Boundary note:** the most recent cohorts have not had time to mature, so their later-month cells are empty (not zero). Read retention along cohorts that are at least *N* months old.
+
+### 06_geographic_analysis / 07_category_performance
+Country- and category-level yearly aggregates with `revenue_rank`, `revenue_share_pct`, `cumulative_revenue_share_pct` (Pareto), `yoy_growth_pct`, and — for categories — `margin_pct` from product cost.
+
+---
+
+## Reproducibility
+
+Every query reads directly from `bigquery-public-data.thelook_ecommerce`, hosted by Google. No upload, no credentials, no expiry — copy a query from [`/sql`](../sql) into BigQuery and run.

@@ -1,6 +1,6 @@
 -- ============================================================
 -- Query 1: Revenue Analysis — Monthly Trends + New vs Returning
--- Project: E-commerce Sales Analysis (Olist)
+-- Project: E-commerce Sales Analysis (theLook)
 -- Author: Ana Paula Borges | github.com/ANAPBORGES
 -- ============================================================
 -- Business question:
@@ -8,48 +8,61 @@
 -- How much comes from new vs returning customers?
 -- Is growth accelerating or decelerating?
 --
--- Note: uses customer_unique_id (not customer_id) to correctly
--- identify returning customers across orders in the Olist dataset,
--- where customer_id is unique per order, not per person.
+-- Source: bigquery-public-data.thelook_ecommerce (Google public dataset).
+-- Revenue recognition: an item counts as revenue only when its status is
+-- not 'Cancelled' or 'Returned'. Customer identity uses user_id (one per
+-- person), so new vs returning is measured cleanly at the person level.
 
-WITH customer_first_order AS (
+WITH valid_items AS (
   SELECT
-    cu.customer_unique_id,
-    DATE_TRUNC(MIN(DATE(o.order_purchase_timestamp)), MONTH) AS first_order_month
-  FROM `analytics-portfolio-496419.olist.orders` o
-  JOIN `analytics-portfolio-496419.olist.customers` cu ON o.customer_id = cu.customer_id
-  WHERE o.order_status = 'delivered'
-  GROUP BY cu.customer_unique_id
+    order_id,
+    user_id,
+    DATE_TRUNC(DATE(created_at), MONTH) AS order_month,
+    sale_price
+  FROM `bigquery-public-data.thelook_ecommerce.order_items`
+  WHERE status NOT IN ('Cancelled', 'Returned')
 ),
 
-monthly_base AS (
+user_first AS (
+  -- Each customer's acquisition month
+  SELECT user_id, MIN(order_month) AS first_month
+  FROM valid_items
+  GROUP BY user_id
+),
+
+order_level AS (
+  -- Collapse items to one row per order, flag whether it was placed in
+  -- the customer's acquisition month (new) or later (returning)
   SELECT
-    FORMAT_DATE('%Y-%m', DATE(o.order_purchase_timestamp))    AS year_month,
-    DATE_TRUNC(DATE(o.order_purchase_timestamp), MONTH)       AS period_date,
-    COUNT(DISTINCT o.order_id)                                AS total_orders,
-    COUNT(DISTINCT cu.customer_unique_id)                     AS unique_customers,
-    ROUND(SUM(p.payment_value), 2)                            AS total_revenue,
-    ROUND(AVG(p.payment_value), 2)                            AS avg_order_value,
-    COUNTIF(DATE_TRUNC(DATE(o.order_purchase_timestamp), MONTH) = cfo.first_order_month) AS new_customers,
-    COUNTIF(DATE_TRUNC(DATE(o.order_purchase_timestamp), MONTH) > cfo.first_order_month) AS returning_customers,
-    ROUND(SUM(CASE
-      WHEN DATE_TRUNC(DATE(o.order_purchase_timestamp), MONTH) = cfo.first_order_month
-      THEN p.payment_value END), 2)                           AS new_customer_revenue,
-    ROUND(SUM(CASE
-      WHEN DATE_TRUNC(DATE(o.order_purchase_timestamp), MONTH) > cfo.first_order_month
-      THEN p.payment_value END), 2)                           AS returning_customer_revenue
-  FROM `analytics-portfolio-496419.olist.orders` o
-  JOIN `analytics-portfolio-496419.olist.payments` p ON o.order_id = p.order_id
-  JOIN `analytics-portfolio-496419.olist.customers` cu ON o.customer_id = cu.customer_id
-  JOIN customer_first_order cfo ON cu.customer_unique_id = cfo.customer_unique_id
-  WHERE o.order_status = 'delivered'
-    AND DATE(o.order_purchase_timestamp) >= '2017-01-01'
-  GROUP BY year_month, period_date
+    vi.order_id,
+    vi.user_id,
+    vi.order_month,
+    SUM(vi.sale_price)              AS order_revenue,
+    (vi.order_month = uf.first_month) AS is_new
+  FROM valid_items vi
+  JOIN user_first uf ON vi.user_id = uf.user_id
+  GROUP BY vi.order_id, vi.user_id, vi.order_month, uf.first_month
+),
+
+monthly AS (
+  SELECT
+    order_month,
+    FORMAT_DATE('%Y-%m', order_month)                          AS year_month,
+    COUNT(DISTINCT order_id)                                   AS total_orders,
+    COUNT(DISTINCT user_id)                                    AS unique_customers,
+    ROUND(SUM(order_revenue), 2)                               AS total_revenue,
+    ROUND(SUM(order_revenue) / COUNT(DISTINCT order_id), 2)    AS avg_order_value,
+    COUNT(DISTINCT IF(is_new, user_id, NULL))                  AS new_customers,
+    COUNT(DISTINCT IF(NOT is_new, user_id, NULL))              AS returning_customers,
+    ROUND(SUM(IF(is_new, order_revenue, 0)), 2)               AS new_customer_revenue,
+    ROUND(SUM(IF(NOT is_new, order_revenue, 0)), 2)           AS returning_customer_revenue
+  FROM order_level
+  GROUP BY order_month
 )
 
 SELECT
   year_month,
-  period_date,
+  order_month,
   total_orders,
   unique_customers,
   total_revenue,
@@ -57,17 +70,17 @@ SELECT
   new_customers,
   returning_customers,
   new_customer_revenue,
-  COALESCE(returning_customer_revenue, 0)                                               AS returning_customer_revenue,
-  ROUND(new_customer_revenue / NULLIF(total_revenue, 0), 4)                            AS new_revenue_pct,
-  ROUND(COALESCE(returning_customer_revenue, 0) / NULLIF(total_revenue, 0), 4)         AS returning_revenue_pct,
-  LAG(total_revenue) OVER (ORDER BY year_month)                                         AS prev_month_revenue,
+  returning_customer_revenue,
+  ROUND(new_customer_revenue / NULLIF(total_revenue, 0), 4)       AS new_revenue_pct,
+  ROUND(returning_customer_revenue / NULLIF(total_revenue, 0), 4) AS returning_revenue_pct,
+  LAG(total_revenue) OVER (ORDER BY order_month)                  AS prev_month_revenue,
   ROUND(
-    (total_revenue - LAG(total_revenue) OVER (ORDER BY year_month))
-    / NULLIF(LAG(total_revenue) OVER (ORDER BY year_month), 0), 4
-  )                                                                                      AS mom_growth_pct,
+    (total_revenue - LAG(total_revenue) OVER (ORDER BY order_month))
+    / NULLIF(LAG(total_revenue) OVER (ORDER BY order_month), 0), 4
+  )                                                               AS mom_growth_pct,
   ROUND(
-    AVG(total_revenue) OVER (ORDER BY year_month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW),
+    AVG(total_revenue) OVER (ORDER BY order_month ROWS BETWEEN 2 PRECEDING AND CURRENT ROW),
     2
-  )                                                                                      AS rolling_3m_avg_revenue
-FROM monthly_base
-ORDER BY year_month;
+  )                                                               AS rolling_3m_avg_revenue
+FROM monthly
+ORDER BY order_month;

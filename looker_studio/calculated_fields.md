@@ -1,94 +1,80 @@
-﻿# Looker Studio — Calculated Fields
+# Looker Studio — Calculated Fields & Visual Mapping
 
-This document describes the calculated fields created in Looker Studio for the E-commerce Sales Analysis dashboard, and the field mappings for each visual across the 3 report pages.
-
-The dashboard connects to three BigQuery views: `vw_revenue_trends`, `vw_cohort_retention`, and `vw_customer_ltv_rfm`. Most visuals use view columns directly. The fields below are either calculated in Looker Studio or are clarifications of how view columns are aggregated per visual.
+This document describes the calculated fields and per-page visual mapping for the 5-page E-commerce Sales Analysis dashboard. Each page is backed by a BigQuery **custom query** (the corresponding file in [`/sql`](../sql)); most visuals use query columns directly, and the fields below are either computed in Looker Studio or clarify how a column is aggregated.
 
 ---
 
 ## Calculated Fields
 
-### AVG Order Value (Sales Overview page)
-
+### AVG Order Value (Sales Overview)
 ```
 SUM(total_revenue) / SUM(total_orders)
 ```
+**Why not use `avg_order_value` directly?** The query pre-computes AOV at the month grain. When several months are selected, averaging pre-computed averages gives an "average of averages" (wrong). Recomputing from `SUM(revenue) / SUM(orders)` always reflects the true average across the selected period.
 
-**Why not use `avg_order_value` directly?**
-The view pre-computes `avg_order_value` at the month grain. When a date filter is applied and multiple months are selected, averaging the pre-computed averages would produce an incorrect result (average of averages). Recalculating from `SUM(revenue) / SUM(orders)` ensures the KPI card and trend chart always reflect the true average across the selected period.
+### Returning revenue share (Sales Overview)
+```
+SUM(returning_customer_revenue) / SUM(total_revenue)
+```
+Share of revenue from customers buying beyond their acquisition month.
+
+### Gross margin % (Category Performance)
+```
+SUM(total_profit) / SUM(total_revenue)
+```
+Recomputed at the selected grain rather than averaging the per-row `margin_pct`.
 
 ---
 
-### RFM Total (Customer Analysis page)
+## Page 1 — Sales Overview  · source: `01_revenue_analysis`
 
-```
-SUM(rfm_total)
-```
-
-Displays the sum of all individual RFM composite scores (r_score + f_score + m_score) across customers in view. Used in the "RFM" KPI card as a proxy for aggregate customer value weight across the base.
-
----
-
-### AVG Score (Customer Analysis page)
-
-```
-SUM(monetary)
-```
-
-Displays total monetary value across the filtered customer base. Despite the "AVG Score" label in the dashboard, this reflects cumulative revenue contribution â€” the name refers to the monetary dimension of the RFM score, not a statistical average.
-
----
-
-## Page 1 â€” Sales Overview
-
-**Data source:** `vw_revenue_trends`
-
-| Visual | Type | Fields | Notes |
-|---|---|---|---|
-| Revenue | KPI card | `SUM(total_revenue)` | R$ 15.422.461,77 total |
-| AVG Order Value | KPI card | `SUM(total_revenue) / SUM(total_orders)` | Calculated field |
-| Orders | KPI card | `SUM(total_orders)` | 96,477 total orders |
-| Revenue over time | Bar chart | `SUM(total_revenue)` by `year_month` | Monthly granularity, Oct 2016â€“Aug 2018 |
-| AVG Order Value over time | Line chart | `SUM(total_revenue) / SUM(total_orders)` by `year_month` | Upward trend showing stable ticket growth |
-| Orders by year | Donut chart | `SUM(total_orders)` by year | 2016 â‰ˆ 1%, 2017 â‰ˆ 45%, 2018 â‰ˆ 54% |
-| Period filter | Date range control | `order_purchase_date` | Applies to all visuals on this page |
-
----
-
-## Page 2 â€” Customer Analysis
-
-**Data source:** `vw_customer_ltv_rfm`
-
-| Visual | Type | Fields | Notes |
-|---|---|---|---|
-| Frequency | KPI card | `COUNT(customer_id)` | 96,477 distinct customers |
-| AVG Score | KPI card | `SUM(monetary)` | Total monetary value of customer base |
-| RFM | KPI card | `SUM(rfm_total)` | Sum of all composite RFM scores |
-| Customer Segment pivot | Pivot table | Rows: `customer_segment` Â· Cols: `f_score` Â· Values: `Record Count` | Shows distribution of frequency score within each segment |
-| Customers by segment | Horizontal bar | `COUNT(customer_id)` by `customer_segment` | Champions and Potential Loyalists each â‰ˆ 25K customers |
-| Segment share | Donut chart | `COUNT(customer_id)` by `customer_segment` | Champions 25.2% Â· Potential Loyalists 25% Â· Loyal Customers 24.8% Â· At Risk 18.5% Â· Lost 6.5% |
-| Period filter | Date range control | `last_purchase_date` | Filters by customer recency window |
-
-**RFM segmentation logic** (applied in SQL, surfaced in Looker Studio as `customer_segment`):
-
-| Segment | RFM Total Score | Business meaning |
+| Visual | Type | Fields |
 |---|---|---|
-| Champions | â‰¥ 10 | Bought recently, buy often, spend the most |
-| Loyal Customers | â‰¥ 8 | Regular buyers with high spend |
-| Potential Loyalists | â‰¥ 6 | Recent buyers with moderate frequency |
-| At Risk | â‰¥ 4 | Haven't bought recently but were valuable |
-| Lost | < 4 | Low recency, frequency, and monetary |
+| Revenue | KPI | `SUM(total_revenue)` — US$8.1M total |
+| AVG Order Value | KPI | `SUM(total_revenue)/SUM(total_orders)` — ≈ US$86 |
+| Orders | KPI | `SUM(total_orders)` — 94K+ |
+| Revenue over time | Bar | `SUM(total_revenue)` by `year_month` (+ `rolling_3m_avg_revenue` line) |
+| New vs Returning | Donut | `09_new_vs_returning`: revenue by `customer_type` (≈ 71% / 29%) |
+| AOV over time | Line | `SUM(total_revenue)/SUM(total_orders)` by `year_month` |
+| Period filter | Date range | `order_month` |
 
----
+## Page 2 — Customer Analysis  · source: `03_customer_ltv_rfm`
 
-## Page 3 â€” Cohort Retention
+| Visual | Type | Fields |
+|---|---|---|
+| Customers | KPI | `COUNT(user_id)` — 66K |
+| Revenue by segment | Bar | `SUM(monetary)` by `customer_segment` |
+| Segment share | Donut | `COUNT(user_id)` by `customer_segment` |
+| Repeat funnel | Bar | `10_repeat_windows`: `repeat_pct` by `repeat_window` (30/90/180d) |
+| Period filter | Date range | `last_purchase_date` |
 
-**Data source:** `vw_cohort_retention`
+**Segments:** Champions (≥10) · Loyal Customers (≥8) · Potential Loyalists (≥6) · At Risk (≥4) · Lost (<4). Real revenue split: Loyal 33.8% · Potential 31.3% · Champions 21.3% · At Risk 12.2% · Lost 1.4%.
 
-| Visual | Type | Fields | Notes |
-|---|---|---|---|
-| Retention by Cohort | Table with heatmap | `cohort_month` Â· `retained_customers` Â· `cohort_customers` | Heat map coloring: blue = retained volume, orange = cohort size. Shows 23 monthly cohorts from Sep 2016 to Jun 2018 |
-| Period filter | Date range control | `cohort_month` | Narrows visible cohort window |
+## Page 3 — Cohort Retention  · source: `08_cohort_matrix`
 
-**Cohort logic** (from SQL): each row represents a cohort defined by the customer's first purchase month. `retained_customers` counts how many from that cohort placed at least one additional order. Because the Olist dataset ends in August 2018, later cohorts (2018) show retention close to 100% â€” they haven't had enough time to churn yet. This is the same boundary-effect observed in the churn analysis of the SaaS project.
+| Visual | Type | Fields |
+|---|---|---|
+| Retention matrix | Pivot / heatmap | Rows `cohort_month` · Cols `month_number` · Value `retention_rate_pct` (or the `m00_pct…m12_pct` columns) |
+| Period filter | Date range | `cohort_month` |
 
+Retention pattern: 100% (M0) → ~5% (M1) → stabilizes ~1.6–2% (M12). The newest cohorts are still maturing, so later cells are blank (not zero).
+
+## Page 4 — Geographic Analysis  · source: `06_geographic_analysis`
+
+| Visual | Type | Fields |
+|---|---|---|
+| World map | Geo map | `SUM(total_revenue)` by `country` |
+| Top countries | Bar / table | `total_revenue`, `revenue_share_pct` by `country` |
+| Concentration KPIs | KPI | `cumulative_revenue_share_pct` for top 3 (≈ 70%) |
+
+Leaders: China ≈ 34% · United States ≈ 23% · Brazil ≈ 14%.
+
+## Page 5 — Category Performance  · source: `07_category_performance`
+
+| Visual | Type | Fields |
+|---|---|---|
+| Pareto chart | Combo | Bars `total_revenue` + line `cumulative_revenue_share_pct` by `category` |
+| Category table | Table | `total_revenue`, `margin_pct`, `yoy_growth_pct`, `pareto_group` |
+| Margin KPI | KPI | `SUM(total_profit)/SUM(total_revenue)` — ≈ 52% |
+
+Top ~8 of 26 categories ≈ 60% of revenue; margins 46–60% (led by Outerwear & Coats, Jeans).
